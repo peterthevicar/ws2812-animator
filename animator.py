@@ -1,6 +1,6 @@
 import time
-import sys
-sys.path.append('../neopixel-simulator')
+# comment out the next line if using the real neopixel library
+import sys, os; sys.path.append(os.path.dirname(os.path.realpath(__file__))+'/neopixel-simulator')
 from neopixel import *
 from gradients import GradientDesc, gradient_preset, SMOOTH, STEP
 from colours import *
