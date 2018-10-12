@@ -33,7 +33,7 @@ LED_CHANNEL = 0			# set to '1' for GPIOs 13, 19, 41, 45 or 53
 
 #----------------------- Some constants for settings readability
 # Motion values
-RIGHT=1; LEFT=2; L2R1=3; STOP = 10000
+STOP = 0; RIGHT=1; LEFT=2; L2R1=3
 # Looping values
 REPEAT=1; REVERSE=2
 #----------------------- neopixel globals
@@ -77,7 +77,7 @@ def _render_fade_spark(t_now):
 	global _fade_t_start
 	if _fade_t_start == 0: _fade_t_start = t_now
 	
-	step = int((t_now -_fade_t_start) / _fade_s_per_step)
+	step = (t_now -_fade_t_start) // _fade_s_per_step
 	if step >= _fade_steps_per_repeat:
 		step = 0
 		_fade_t_start = t_now
@@ -118,7 +118,7 @@ def _render_spot(t_now):
 	if _spot_t_start == 0: _spot_t_start = t_now
 	
 	global _spot_motion_now
-	step = int((t_now - _spot_t_start) / _spot_s_per_step)
+	step = int((t_now - _spot_t_start) // _spot_s_per_step)
 	if step >= _spot_steps_per_repeat: # Completed run, start again
 		step = 0
 		_spot_t_start = t_now;
@@ -128,9 +128,10 @@ def _render_spot(t_now):
 	# Work out the direction we're going
 	if _spot_motion_now == RIGHT: ix = step # Count up
 	else: ix = _pat_seg_size -_spot_size - step # Count down
-	#print('step',step,'/',_spot_steps_per_repeat,'ix',ix)
+	# ~ print('DEBUG: spot step=', step, '/', _spot_steps_per_repeat,' spot ix=', ix)
 
 	# Paint the spot in its current position
+	# ~ print('DEBUG: ix=', ix, ' _spot_size=', _spot_size)
 	_pat_strip.getPixels()[ix:ix+_spot_size]=[_spot_colour]*_spot_size
 			
 	return _spot_t_start + _spot_s_per_step*(step+1); # Theoretical start time for next step (may be past)
@@ -159,11 +160,11 @@ _l2r1_t = 0
 _l2r1_d = 0
 def _set_l2r1_globals():
 	global _l2r1_l, _l2r1_r, _l2r1_t, _l2r1_d
-	_l2r1_l = max(2, _pat_seg_size/5)
-	_l2r1_r = max(1, _l2r1_l/3)
+	_l2r1_l = max(2, _pat_seg_size//5)
+	_l2r1_r = max(1, _l2r1_l//3)
 	_l2r1_t = _l2r1_l + _l2r1_r
 	_l2r1_d = _l2r1_l - _l2r1_r
-	#print('r',_l2r1_r,'l',_l2r1_l,'ss/t*t',_pat_seg_size/_l2r1_t*_l2r1_t)
+	# ~ print('DEBUG: r=',_l2r1_r,' l=',_l2r1_l,' ss//t*t=',_pat_seg_size//_l2r1_t*_l2r1_t)
 
 def _render_pattern(t_now):
 	# Find out which step we're on in the pattern, need to calculate this as timing is 
@@ -176,13 +177,16 @@ def _render_pattern(t_now):
 	
 	global _pat_s_per_step, _pat_steps_per_repeat
 	global _pat_motion_0, _pat_motion_now, _pat_reverse
-	if _pat_s_per_step == STOP:
+	# ~ print("DEBUG: _pat_motion_now=",_pat_motion_now)
+	if _pat_motion_now == STOP:
 		step = 0
 	else:
-		step = int((t_now - _pat_t_start) / _pat_s_per_step + 0.5)
+		step = int(((t_now - _pat_t_start) / _pat_s_per_step) + 0.5)
 		if step >= _pat_steps_per_repeat: # completed pattern, start again
 			step = 0;
-			if _pat_reverse == REVERSE: _pat_motion_now = RIGHT if _pat_motion_now == LEFT else LEFT 
+			if _pat_motion_now != L2R1: 
+				if _pat_reverse == REVERSE: 
+					_pat_motion_now = RIGHT if _pat_motion_now == LEFT else LEFT 
 			_pat_t_start = t_now
 	# Calculate start point for copying entries from the pattern palette (pat_ix)
 	# Use the step number and the direction of motion
@@ -194,13 +198,13 @@ def _render_pattern(t_now):
 	elif _pat_motion_now == L2R1:
 		# This is the complicated one: turns out this does the trick! T=total(L,R), D=difference(L,R)
 		rem = step % _l2r1_t
-		pat_ix = (step / _l2r1_t) * _l2r1_d + (rem if rem <= _l2r1_l else _l2r1_l - (rem - _l2r1_l))
+		pat_ix = (step // _l2r1_t) * _l2r1_d + (rem if rem <= _l2r1_l else _l2r1_l - (rem - _l2r1_l))
 		pat_ix = pat_ix % _pat_seg_size # cope with wrap around
 
-	#print(step, 'LEFT' if _pat_motion_now==LEFT else 'RIGHT' if _pat_motion_now==RIGHT else 'L2R1', pat_ix)
+	# ~ print('DEBUG: step=',step, 'LEFT' if _pat_motion_now==LEFT else 'RIGHT' if _pat_motion_now==RIGHT else 'L2R1', "pat_seg=", _pat_seg_size, " pat_ix=", pat_ix)
 	_pat_strip.getPixels()[0:_pat_seg_size]=_gra_data[pat_ix:_pat_seg_size]+_gra_data[:pat_ix]
 	
-	if _pat_s_per_step == STOP:
+	if _pat_motion_now == STOP:
 		return t_now + 10 # no need but it seems nice to refresh every now and again!
 	else:
 		return _pat_t_start + _pat_s_per_step*(step+1); # Theoretical start time for next step (may be past)
@@ -264,7 +268,7 @@ def anim_define_pattern(g_desc, segments, seg_reverse, motion, repeat_s, reverse
 				
 	global _pat_segments, _pat_seg_size, _leds_in_use
 	_pat_segments = segments
-	_pat_seg_size = LED_COUNT / _pat_segments
+	_pat_seg_size = LED_COUNT // _pat_segments
 	_set_l2r1_globals()
 	_leds_in_use = _pat_seg_size * _pat_segments
 	
@@ -273,18 +277,21 @@ def anim_define_pattern(g_desc, segments, seg_reverse, motion, repeat_s, reverse
 
 	global _pat_motion_now, _pat_steps_per_repeat
 	_pat_motion_now = motion
+	# ~ print("DEBUG: motion=",motion,"seg_sz=",_pat_seg_size)
 	if motion == LEFT or motion == RIGHT:
 		_pat_steps_per_repeat = _pat_seg_size
 	elif motion == L2R1:
 		# This is hard because _l2r1_d is not 1 so not every length can be exactly accommodated
-		wholes = _pat_seg_size / _l2r1_d
+		wholes = _pat_seg_size // _l2r1_d
 		rem = _pat_seg_size % _l2r1_d
 		_pat_steps_per_repeat = _l2r1_t * wholes + rem
-		#print('seg_size',_pat_seg_size, 'steps_per_repeat',_pat_steps_per_repeat)
+		# ~ print('DEBUG: seg_size',_pat_seg_size, 'steps_per_repeat',_pat_steps_per_repeat)
+	else: # stop
+		_pat_steps_per_repeat = 0;
 
 	global _pat_s_per_step
-	_pat_s_per_step = float(repeat_s) / _pat_steps_per_repeat
-	#print(_pat_s_per_step)
+	if motion != STOP: _pat_s_per_step = float(repeat_s) / _pat_steps_per_repeat
+	print("DEBUG: s_per_step=",_pat_s_per_step)
 
 	global _pat_reverse
 	_pat_reverse = reverse
@@ -296,7 +303,7 @@ def anim_define_pattern(g_desc, segments, seg_reverse, motion, repeat_s, reverse
 	# request restart of the animation
 	global _pat_t_start
 	_pat_t_start = 0
-	#print('seg_size',_pat_seg_size,'tot',_pat_seg_size*_pat_segments)
+	# ~ print('DEBUG: seg_size',_pat_seg_size,'tot',_pat_seg_size*_pat_segments)
 
 def anim_set_brightness(new_b):
 	global _brightness
@@ -307,7 +314,7 @@ def anim_set_brightness(new_b):
 
 def anim_define_sparkle(s_per_k, s_duration=0.1):
 	global _spark_count
-	_spark_count = s_per_k * _leds_in_use / 1000
+	_spark_count = s_per_k * _leds_in_use // 1000
 	
 	global _spark_duration
 	_spark_duration = s_duration
@@ -335,7 +342,8 @@ def anim_define_spot(s_size, s_colour, s_motion=RIGHT, s_secs=5, s_reverse=REVER
 	if s_size <= 0:
 		_spot_size = 0
 	else:
-		_spot_size = max(1, s_size*_pat_seg_size / 32) 
+		_spot_size = max(1, s_size*_pat_seg_size // 32)
+		# ~ print('DEBUG: spot_sz=', _spot_size) 
 		_spot_steps_per_repeat = _pat_seg_size - _spot_size; # Prevent overflow
 			
 	global _spot_colour

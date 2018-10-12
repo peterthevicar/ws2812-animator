@@ -66,36 +66,36 @@ class GradientDesc:
 		will periodically overwrite the last bit
 		"""
 		# calculate the max size of each of the repeats in the gradient
-		part_sz = (size+self.repeats-1)/self.repeats
-		
+		part_sz = (size+self.repeats-1)//self.repeats
+		print("DEBUG: gradient part_sz=",part_sz)
 		# fill in the first part
 		if self.blend != SMOOTH: # simple case
 			ncols = len(self.colours)
 			for i in range(part_sz):
-			  out_data[i] = self.colours[ncols*i/part_sz]
+			  out_data[i] = self.colours[ncols*i//part_sz]
 		else:
 			ncols = len(self.colours) - 1 # last colour is reserved for final data point
 			out_data[part_sz-1] = self.colours[ncols]
 			sm1 = part_sz - 1 # we're working with this part now
-			i_per_c = float(sm1)/ncols
+			i_per_c = float(sm1)//ncols
 			cur_c = -1
 			for i in range(sm1):
-				this_c = ncols * i / sm1
+				this_c = ncols * i // sm1
 				if this_c != cur_c:
 					cur_c = this_c
 					cur_ci = i
 					colour1 = self.colours[this_c]
 					colour2 = self.colours[this_c + 1]
 				out_data[i] = _interp(colour1, colour2, float(i-cur_ci) / i_per_c)
-				#print(i,ncols,this_c,'colour1 {0:#08x}, colour2 {1:#08x}, ipercol:{2:1.2f} ithisc:{3:d} res:{4:#08x} prop:{5:1.2f}'.format(colour1,colour2,i_per_c,cur_ci,out_data[i],float(i-cur_ci) / i_per_c))
-		#print('part_sz',part_sz,out_data)
+				# ~ print(i,ncols,this_c,'DEBUG: colour1 {0:#08x}, colour2 {1:#08x}, ipercol:{2:1.2f} ithisc:{3:d} res:{4:#08x} prop:{5:1.2f}'.format(colour1,colour2,i_per_c,cur_ci,out_data[i],float(i-cur_ci) / i_per_c))
+		# ~ print('DEBUG: part_sz=', part_sz, ' out_data=', out_data)
 		# Copy to other parts. Start at the top to avoid overwriting the master copy
 		for part in range(self.repeats-1,0,-1): 
-			i = size * part/self.repeats
+			i = size * part//self.repeats
 			out_data[i:i+part_sz]=out_data[0:part_sz]
 		# put in the black bars
 		if self.bar_on > 0:
-			d_sz = max(1, size / 128)
+			d_sz = max(1, size // 128)
 			on_sz = self.bar_on * d_sz
 			off_sz = self.bar_off * d_sz
 			bar = [RGB_Black] * on_sz
