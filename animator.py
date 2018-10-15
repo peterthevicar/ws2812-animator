@@ -57,6 +57,15 @@ _sparkles = None				# vector of random indexes into the led data
 _spark_t_start = 0				# when this pattern of sparles started
 _spark_duration = None			# how long each pattern of sparkles lasts (secs)
 
+def _fade_scale(f_min, f_max):
+	global _fade_min, _fade_max, _fade_steps_per_half, _fade_steps_per_repeat
+	_fade_min = int(_brightness*f_min/100)
+	_fade_max = int(_brightness*f_max/100)
+	_fade_steps_per_half = max(0, _fade_max - _fade_min)
+	_fade_steps_per_repeat = _fade_steps_per_half * 2
+	# ~ print('DEBUG:animator:65 min=', _fade_min, ' max=', _fade_max, ' steps=',_fade_steps_per_repeat)
+
+
 def _render_fade_spark(t_now):
 	# First the sparkles - a random set of places to set white for _spark_duration
 	global _sparkles, _spark_t_start
@@ -191,7 +200,7 @@ def _render_pattern(t_now):
 	# Calculate start point for copying entries from the pattern palette (pat_ix)
 	# Use the step number and the direction of motion
 	# Work out the direction we're going
-	if _pat_motion_now == LEFT:
+	if _pat_motion_now == LEFT or _pat_motion_now == STOP:
 		pat_ix = step # Count up
 	elif _pat_motion_now == RIGHT:
 		pat_ix = _pat_seg_size-1 - step # Count down
@@ -221,7 +230,7 @@ def _render_frame():
 	if (_brightness == 0):
 		_pat_strip.show()
 		return t_now + 1
-	
+
 	# copy the gradient into all the segments
 	pat_t_next = _render_pattern(t_now)
 	
@@ -291,7 +300,7 @@ def anim_define_pattern(g_desc, segments, seg_reverse, motion, repeat_s, reverse
 
 	global _pat_s_per_step
 	if motion != STOP: _pat_s_per_step = float(repeat_s) / _pat_steps_per_repeat
-	print("DEBUG: s_per_step=",_pat_s_per_step)
+	# ~ print("DEBUG: s_per_step=",_pat_s_per_step)
 
 	global _pat_reverse
 	_pat_reverse = reverse
@@ -304,38 +313,6 @@ def anim_define_pattern(g_desc, segments, seg_reverse, motion, repeat_s, reverse
 	global _pat_t_start
 	_pat_t_start = 0
 	# ~ print('DEBUG: seg_size',_pat_seg_size,'tot',_pat_seg_size*_pat_segments)
-
-def anim_set_brightness(new_b):
-	global _brightness
-	if new_b != _brightness:
-		_brightness = new_b
-		_pat_strip.setBrightness(_brightness)
-		#TODO digitalWrite(LED_POWER_PIN, (_brightness != 0)); # Switch on or off main power supply to LEDs
-
-def anim_define_sparkle(s_per_k, s_duration=0.1):
-	global _spark_count
-	_spark_count = s_per_k * _leds_in_use // 1000
-	
-	global _spark_duration
-	_spark_duration = s_duration
-
-def anim_define_fade(f_secs, f_blend=SMOOTH, f_min=0, f_max=255):
-	
-	global _fade_steps_per_repeat
-	if f_secs <= 0: # switch off fading
-		_fade_steps_per_repeat = 0
-		return
-		
-	global _fade_blend
-	_fade_blend = f_blend
-	
-	global _fade_min, _fade_max, _fade_steps_per_half
-	_fade_min = f_min; _fade_max = f_max
-	_fade_steps_per_half = max(0, f_max - f_min)
-	_fade_steps_per_repeat = _fade_steps_per_half * 2
-
-	global _fade_s_per_step
-	_fade_s_per_step = float(f_secs) / _fade_steps_per_repeat
 
 def anim_define_spot(s_size, s_colour, s_motion=RIGHT, s_secs=5, s_reverse=REVERSE):
 	global _spot_size, _spot_steps_per_repeat
@@ -362,8 +339,39 @@ def anim_define_spot(s_size, s_colour, s_motion=RIGHT, s_secs=5, s_reverse=REVER
 	global _spot_t_start
 	_spot_t_start = 0
 
+def anim_define_sparkle(s_per_k, s_duration=0.1):
+	global _spark_count
+	_spark_count = s_per_k * _leds_in_use // 1000
+	
+	global _spark_duration
+	_spark_duration = s_duration
+
+def anim_define_fade(f_secs, f_blend=SMOOTH, f_min=0, f_max=100):
+	
+	global _fade_steps_per_repeat
+	if f_secs <= 0: # switch off fading
+		_fade_steps_per_repeat = 0
+		return
+		
+	global _fade_blend
+	_fade_blend = f_blend
+	
+	_fade_scale(f_min, f_max)
+
+	global _fade_s_per_step
+	_fade_s_per_step = float(f_secs) / _fade_steps_per_repeat
+
 def anim_define_meteor(m_on):
 	Pass #FIXME if !meteorMaster digitalWrite(METEOR_PIN, cur.meteorUserOn); # Don't write if under master control
+
+def anim_set_brightness(new_b):
+	global _brightness
+	if new_b != _brightness:
+		old_b = _brightness; _brightness = new_b
+		# Re-scale the fade min and max values
+		_fade_scale(_fade_min*100/old_b, _fade_max*100/old_b)
+		_pat_strip.setBrightness(_brightness)
+		#TODO digitalWrite(LED_POWER_PIN, (_brightness != 0)); # Switch on or off main power supply to LEDs
 
 def anim_render(stop_time=0):
 	"""
