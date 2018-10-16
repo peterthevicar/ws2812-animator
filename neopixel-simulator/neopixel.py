@@ -1,3 +1,5 @@
+# This is a drop-in replacement for the real neopixel library to give a quick
+# simulation of an LED strip on a computer screen
 import numpy
 import cv2
 import time
@@ -45,8 +47,9 @@ class Adafruit_NeoPixel:
 			adjusted_colour = _adjust_colour(self._led_data[ix], self.brightness)
 			cv2.circle(self.IMAGE, (int(self.LED_W*(ix+1) + 0.5), LED_R*2), LED_R, adjusted_colour, -1)
 		cv2.imshow('neopixel', self.IMAGE)
-		if cv2.waitKey(1) != 255: # seem to need about 40ms before anything appears on the screen
-			print('*** Interrupted by keyboard ***')
+		key = cv2.waitKeyEx(1)
+		if key != -1: # seem to need about 40ms before anything appears on the screen
+			print('*** Interrupted by keyboard *** character code=', key)
 			sys.exit(99)
 			
 	def setPixelColorRGB(self, ix, r, g, b, w = 0):
