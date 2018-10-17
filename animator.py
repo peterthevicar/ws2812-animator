@@ -3,6 +3,7 @@ import time
 import sys, os
 try:
 	from rpi_ws281x import *
+	import numpy
 except:
 	sys.path.append(os.path.dirname(os.path.realpath(__file__))+'/rpi-ws281x-simulator')
 	from rpi_ws281x_simulator import *
@@ -42,31 +43,33 @@ STOP = 0; RIGHT=1; LEFT=2; L2R1=3
 REPEAT=1; REVERSE=2
 #----------------------- neopixel globals
 # This is where the WS2812 library stores its stuff
-_pat_strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, 
+_pat_strip = PixelStrip(LED_COUNT, LED_PIN, LED_FREQ_HZ, 
 	LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
 _brightness = LED_BRIGHTNESS	# This may be changed by fading and anim_define_brightness
 
 #----------------------- Fade and sparkle stuff
 _fade_blend = None				# square wave or sawtooth
-_fade_min = None				# dimmest value
-_fade_max = None				# brightest value
-_fade_steps_per_repeat = None	# how long the fade cycle is
-_fade_steps_per_half = None		# half a cycle
-_fade_s_per_step = None			# how long each frame in the fade is
+_fade_min = 0					# dimmest value
+_fade_max = 100					# brightest value
+_fade_steps_per_repeat = None			# how long the fade cycle is
+_fade_s_per_repeat = None			# how long the fade cycle is
+_fade_steps_per_half = None			# half a cycle
+_fade_s_per_step = None				# how long each frame in the fade is
 _fade_t_start = 0				# when the cycle began
 
 # Sparkle
 _spark_count = 0				# Number of sparks to add in per step
 _sparkles = None				# vector of random indexes into the led data
 _spark_t_start = 0				# when this pattern of sparles started
-_spark_duration = None			# how long each pattern of sparkles lasts (secs)
+_spark_duration = None				# how long each pattern of sparkles lasts (secs)
 
 def _fade_scale(f_min, f_max):
-	global _fade_min, _fade_max, _fade_steps_per_half, _fade_steps_per_repeat
+	global _fade_min, _fade_max, _fade_steps_per_half, _fade_steps_per_repeat, _fade_s_per_step
 	_fade_min = int(_brightness*f_min/100)
 	_fade_max = int(_brightness*f_max/100)
 	_fade_steps_per_half = max(0, _fade_max - _fade_min)
 	_fade_steps_per_repeat = _fade_steps_per_half * 2
+	_fade_s_per_step = _fade_s_per_repeat / _fade_steps_per_repeat
 	# ~ print('DEBUG:animator:65 min=', _fade_min, ' max=', _fade_max, ' steps=',_fade_steps_per_repeat)
 
 
@@ -84,7 +87,7 @@ def _render_fade_spark(t_now):
 	else:
 		t_next = t_now + 1000
 		
-	if _fade_steps_per_repeat == 0:
+	if _fade_steps_per_repeat == 0: # No fading so return
 		return t_next
 
 	global _fade_t_start
@@ -104,7 +107,7 @@ def _render_fade_spark(t_now):
 			new_b = _fade_max - (step - _fade_steps_per_half)
 			
 	# Set the new value which mustn't be above the currently set brightness
-	new_b = min(new_b, _brightness)
+	new_b = int(min(new_b, _brightness))
 	if new_b != _pat_strip.getBrightness():
 		_pat_strip.setBrightness(new_b)
 	
@@ -359,11 +362,9 @@ def anim_define_fade(f_secs, f_blend=SMOOTH, f_min=0, f_max=100):
 		
 	global _fade_blend
 	_fade_blend = f_blend
-	
+	global _fade_s_per_repeat
+	_fade_s_per_repeat = f_secs
 	_fade_scale(f_min, f_max)
-
-	global _fade_s_per_step
-	_fade_s_per_step = float(f_secs) / _fade_steps_per_repeat
 
 def anim_define_meteor(m_on):
 	Pass #FIXME if !meteorMaster digitalWrite(METEOR_PIN, cur.meteorUserOn); # Don't write if under master control
@@ -372,8 +373,8 @@ def anim_set_brightness(new_b):
 	global _brightness
 	if new_b != _brightness:
 		old_b = _brightness; _brightness = new_b
-		# Re-scale the fade min and max values
-		_fade_scale(_fade_min*100/old_b, _fade_max*100/old_b)
+		# Re-scale the fade min and max values if fading is going on
+		#if _fade_steps_per_repeat != 0: _fade_scale(_fade_min*100/old_b, _fade_max*100/old_b)
 		_pat_strip.setBrightness(_brightness)
 		#TODO digitalWrite(LED_POWER_PIN, (_brightness != 0)); # Switch on or off main power supply to LEDs
 
