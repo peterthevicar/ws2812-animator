@@ -1,7 +1,11 @@
 import time
 # comment out the next line if using the real neopixel library
-import sys, os; sys.path.append(os.path.dirname(os.path.realpath(__file__))+'/neopixel-simulator')
-from neopixel import *
+import sys, os
+try:
+	from rpi_ws281x import *
+except:
+	sys.path.append(os.path.dirname(os.path.realpath(__file__))+'/rpi-ws281x-simulator')
+	from rpi_ws281x_simulator import *
 from gradients import GradientDesc, gradient_preset, SMOOTH, STEP
 from colours import *
 

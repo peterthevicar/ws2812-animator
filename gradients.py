@@ -1,7 +1,10 @@
 import time
 import sys
-sys.path.append('../neopixel-simulator')
-from neopixel import Color
+try:
+	from rpi_ws281x import Color
+except:
+	import os; sys.path.append(os.path.dirname(os.path.realpath(__file__))+'/rpi-ws281x-simulator')
+	from rpi_ws281x_simulator import Color
 from colours import *
 # How it works overview:
 # The gradient description is used to 
