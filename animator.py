@@ -28,11 +28,9 @@ from colours import *
 # Once the pattern is complete it is sent to the LEDs
 
 # LED strip configuration passed to WS2812 library:
-LED_COUNT = 200			# Number of LED pixels.
 LED_PIN = 18			# GPIO pin connected to the pixels (18 uses PWM1).
 LED_FREQ_HZ = 800000	# LED signal frequency in hertz (usually 800khz)
 LED_DMA = 10			# DMA channel to use for generating signal (try 10)
-LED_BRIGHTNESS = 255	# Set to 0 for darkest and 255 for brightest
 LED_INVERT = False		# True to invert the signal (when using NPN transistor level shift)
 LED_CHANNEL = 0			# set to '1' for GPIOs 13, 19, 41, 45 or 53
 
@@ -42,10 +40,9 @@ STOP = 0; RIGHT=1; LEFT=2; L2R1=3
 # Looping values
 REPEAT=1; REVERSE=2
 #----------------------- neopixel globals
-# This is where the WS2812 library stores its stuff
-_pat_strip = PixelStrip(LED_COUNT, LED_PIN, LED_FREQ_HZ, 
-	LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
-_brightness = LED_BRIGHTNESS	# This may be changed by fading and anim_define_brightness
+_pat_strip = None # This is where the WS2812 library stores its stuff
+_max_brightness = None
+_led_count = None
 
 #----------------------- Fade and sparkle stuff
 _fade_blend = None				# square wave or sawtooth
@@ -61,17 +58,16 @@ _fade_t_start = 0				# when the cycle began
 _spark_count = 0				# Number of sparks to add in per step
 _sparkles = None				# vector of random indexes into the led data
 _spark_t_start = 0				# when this pattern of sparles started
-_spark_duration = None				# how long each pattern of sparkles lasts (secs)
+_spark_duration = None			# how long each pattern of sparkles lasts (secs)
 
 def _fade_scale(f_min, f_max):
-	global _fade_min, _fade_max, _fade_steps_per_half, _fade_steps_per_repeat, _fade_s_per_step
-	_fade_min = int(_brightness*f_min/100)
-	_fade_max = int(_brightness*f_max/100)
-	_fade_steps_per_half = max(0, _fade_max - _fade_min)
-	_fade_steps_per_repeat = _fade_steps_per_half * 2
-	_fade_s_per_step = _fade_s_per_repeat / _fade_steps_per_repeat
-	# ~ print('DEBUG:animator:65 min=', _fade_min, ' max=', _fade_max, ' steps=',_fade_steps_per_repeat)
-
+       global _fade_min, _fade_max, _fade_steps_per_half, _fade_steps_per_repeat, _fade_s_per_step
+       _fade_min = int(_max_brightness*f_min/100)
+       _fade_max = int(_max_brightness*f_max/100)
+       _fade_steps_per_half = max(0, _fade_max - _fade_min)
+       _fade_steps_per_repeat = _fade_steps_per_half * 2
+       _fade_s_per_step = _fade_s_per_repeat / _fade_steps_per_repeat
+       # ~ print('DEBUG:animator:65 min=', _fade_min, ' max=', _fade_max, ' steps=',_fade_steps_per_repeat)
 
 def _render_fade_spark(t_now):
 	# First the sparkles - a random set of places to set white for _spark_duration
@@ -106,8 +102,8 @@ def _render_fade_spark(t_now):
 		else: # ramping down
 			new_b = _fade_max - (step - _fade_steps_per_half)
 			
-	# Set the new value which mustn't be above the currently set brightness
-	new_b = int(min(new_b, _brightness))
+	# Set the new value which mustn't be above the currently set max brightness
+	new_b = int(min(new_b, _max_brightness))
 	if new_b != _pat_strip.getBrightness():
 		_pat_strip.setBrightness(new_b)
 	
@@ -165,8 +161,8 @@ _pat_t_start = 0
 _pat_s_per_step = 0
 # Gradient object and data
 _gra_desc = None
-_gra_data = [0]*LED_COUNT # maximum size a segment can be
-_leds_in_use = LED_COUNT # how many are actually being used
+_gra_data = None # maximum size a segment can be
+_leds_in_use = None # how many are actually being used
 
 # Definition for the L2R1 motion - how far right and then left to go.
 # These vary according to the segment size
@@ -234,7 +230,7 @@ def _render_frame():
 	t_now = time.time() # Use the same time throughout the calculations
 
 	# Handle blanking
-	if (_brightness == 0):
+	if (_max_brightness == 0):
 		_pat_strip.show()
 		return t_now + 1
 
@@ -264,13 +260,26 @@ def _render_frame():
 #
 # -------------------------- INTERFACE FUNCTIONS ----------------------
 #
-
-def anim_init():
+def anim_init(led_count, max_brightness):
 	"""
 	Initial set up of the system
 	"""
-	_pat_strip.begin()
+	global _led_count, _gra_data
+	_led_count = led_count
+	_gra_data = [0]*led_count # Maximum segment size
+	
+	global _max_brightness
+	_max_brightness = max_brightness
 
+	global _pat_strip
+	_pat_strip = PixelStrip(led_count, LED_PIN, LED_FREQ_HZ, 
+	LED_DMA, LED_INVERT, _max_brightness, LED_CHANNEL)
+	_pat_strip.begin()
+	
+	# Switch off sparkle, fade and spot
+	global _spark_count, _fade_steps_per_repeat, _spot_size
+	_spark_count = 0; _fade_steps_per_repeat = 0; _spot_size = 0
+	
 def anim_define_pattern(g_desc, segments, seg_reverse, motion, repeat_s, reverse):
 	"""
 	Set the globals for the main pattern generation. 
@@ -284,7 +293,7 @@ def anim_define_pattern(g_desc, segments, seg_reverse, motion, repeat_s, reverse
 				
 	global _pat_segments, _pat_seg_size, _leds_in_use
 	_pat_segments = segments
-	_pat_seg_size = LED_COUNT // _pat_segments
+	_pat_seg_size = _led_count // _pat_segments
 	_set_l2r1_globals()
 	_leds_in_use = _pat_seg_size * _pat_segments
 	
@@ -369,15 +378,22 @@ def anim_define_fade(f_secs, f_blend=SMOOTH, f_min=0, f_max=100):
 def anim_define_meteor(m_on):
 	Pass #FIXME if !meteorMaster digitalWrite(METEOR_PIN, cur.meteorUserOn); # Don't write if under master control
 
-def anim_set_brightness(new_b):
-	global _brightness
-	if new_b != _brightness:
-		old_b = _brightness; _brightness = new_b
+def anim_set_max_brightness(new_b):
+	global _max_brightness
+	if new_b != _max_brightness:
+		old_b = _max_brightness; _max_brightness = new_b
 		# Re-scale the fade min and max values if fading is going on
-		#if _fade_steps_per_repeat != 0: _fade_scale(_fade_min*100/old_b, _fade_max*100/old_b)
-		_pat_strip.setBrightness(_brightness)
-		#TODO digitalWrite(LED_POWER_PIN, (_brightness != 0)); # Switch on or off main power supply to LEDs
+		if _fade_steps_per_repeat != 0:
+			_fade_scale(_fade_min*100/old_b, _fade_max*100/old_b)
+		_pat_strip.setBrightness(_max_brightness)
 
+def anim_stop():
+	"""
+	Called to turn everything off
+	"""
+	if _pat_strip != None:
+		anim_set_max_brightness(0)
+		
 def anim_render(stop_time=0):
 	"""
 	Keep transfering the animation to the LEDs until time is up
@@ -385,7 +401,8 @@ def anim_render(stop_time=0):
 	from that time
 	"""
 	# blank any unused LEDs
-	if _leds_in_use < LED_COUNT: _pat_strip.getPixels()[_leds_in_use:LED_COUNT]=[RGB_Black]*(LED_COUNT-_leds_in_use)
+	if _leds_in_use < _led_count: 
+		_pat_strip.getPixels()[_leds_in_use:_led_count] = [RGB_Black]*(_led_count-_leds_in_use)
 	#fn=1
 	while stop_time == 0 or time.time() < stop_time:
 		#print('frame:',fn)
