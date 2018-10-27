@@ -45,6 +45,8 @@ _max_brightness = None
 _led_count = None
 
 #----------------------- DMX control stuff
+from dmx import *
+
 _dmx_off_auto_indep = None
 _dmx_gradient = None
 _dmx_t_start = None
@@ -54,9 +56,6 @@ _dmx_s_per_step = None
 _dmx_offsv = None
 _dmx_last_step = None
 
-def _dmx_set(device_n, colour):
-	print("DEBUG:animator:433: set device #", device_n, 'to colour', colour)
-	
 def _dmx_scale(dmx_maxval):
 	global _dmx_offsv
 	print('DEBUG:animator:61 _dmx_offsv=', _dmx_offsv)
@@ -88,23 +87,23 @@ def _render_dmx(t_now):
 		if step == _dmx_last_step:
 			pass # nothing to do	
 		else:
-			for d, offs in enumerate(_dmx_offsv):
-				offs_step = int(step+offs % _dmx_steps_per_repeat)
-				# ~ print('DEBUG:animator:87 last_step=', _dmx_last_step, 'step=', step, ' offs_step=', offs_step)
+			for u, offs in enumerate(_dmx_offsv):
+				offs_step = int((step + offs) % _dmx_steps_per_repeat)
+				print('DEBUG:animator:87 last_step=', _dmx_last_step, 'step=', step, ' offs_step=', offs_step)
 				if offs_step < _dmx_steps_per_half: # Forwards through gradient
 					new_colour = _dmx_gradient[offs_step]
 				else: # Backwards
 					new_colour = _dmx_gradient[_dmx_steps_per_repeat - offs_step - 1]
 				# Set the new value
-				_dmx_set(d, new_colour)
+				dmx_put_unit(u, new_colour, _max_brightness)
 			_dmx_last_step = step
 
 		return _dmx_t_start + (step+1) * _dmx_s_per_step	
 
 	else:
 		# Auto: dmx lights set according to their linked LEDs
-		for d, offs in enumerate(_dmx_offsv):
-			_dmx_set(d, _pat_strip.getPixels()[offs])
+		for u, offs in enumerate(_dmx_offsv):
+			dmx_put_unit(u, _pat_strip.getPixels()[offs], _max_brightness)
 			
 		return t_now + _dmx_s_per_step
 		
@@ -352,8 +351,8 @@ def anim_init(led_count, max_brightness):
 	# Switch off DMX
 	global _dmx_off_auto_indep
 	_dmx_off_auto_indep = 0
-	if _dmx_offsv != None:
-		for ix, offs in _dmx_offsv: _dmx_set(ix, 0)
+	try: dmx_close()
+	except: pass
 	
 def anim_define_pattern(g_desc, segments, seg_reverse, motion, repeat_s, reverse):
 	"""
@@ -462,10 +461,14 @@ def anim_define_dmx(d_off_auto_indep=0, d_posv=[25,75], d_secs=5, d_gradient_des
 	"""
 	global _dmx_off_auto_indep
 	_dmx_off_auto_indep = d_off_auto_indep
+	
+	try: dmx_close()
+	except: pass
 
 	if d_off_auto_indep == 0: # off
-		_dmx_set(0)
 		return
+
+	dmx_init()
 
 	global _dmx_posv
 	_dmx_posv = d_posv
@@ -497,7 +500,6 @@ def anim_define_dmx(d_off_auto_indep=0, d_posv=[25,75], d_secs=5, d_gradient_des
 		_dmx_offsv = d_posv[:]
 		_dmx_scale(_leds_in_use)
 		_dmx_s_per_step = 1 / FPS
-	print('DEBUG:animator:492 steps_per_repeat=', _dmx_steps_per_repeat, 'frames_per_half=', frames_per_half)
 	
 def anim_define_meteor(m_on):
 	Pass #FIXME if !meteorMaster digitalWrite(METEOR_PIN, cur.meteorUserOn); # Don't write if under master control
@@ -517,6 +519,8 @@ def anim_stop():
 	"""
 	if _pat_strip != None:
 		anim_set_max_brightness(0)
+	try: dmx_stop()
+	except: pass
 		
 def anim_render(stop_time=0):
 	"""
@@ -530,3 +534,12 @@ def anim_render(stop_time=0):
 		pause = t_next - time.time()
 		if pause > 0: time.sleep(pause)
 		
+if __name__ == "__main__":
+	anim_init(150, 200)
+	anim_define_pattern(gradient_preset(6), 1, seg_reverse=REPEAT, motion=LEFT, repeat_s=5, reverse=REPEAT)
+	anim_define_spot(s_size=3, s_colour=0x00FF00, s_motion=RIGHT, s_secs=5, s_reverse=REVERSE)
+	anim_define_sparkle(s_per_k=10, s_duration=0.1)
+	anim_define_fade(f_secs=5, f_blend=SMOOTH, f_min=50, f_max=100)
+	anim_define_dmx(d_off_auto_indep=2, d_posv=[25,75], d_secs=5, d_gradient_desc=gradient_preset(3))
+	anim_render(time.time()+30)
+	
