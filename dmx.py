@@ -9,13 +9,22 @@ except:
 
 from time import sleep, time
 
-_DMX_UNIVERSE_SIZE = 255
+_DMX_UNIVERSE_SIZE = 512
 _DMX_CHANS_PER_UNIT = 7
 _dmx = None
-_dmx_buffer = [0 for v in range(0, _DMX_UNIVERSE_SIZE)]
+_dmx_buffer = [0]*_DMX_UNIVERSE_SIZE
+
+def test():
+	# Need to keep resending at the correct refresh rate. QLC+ says it's 30fps
+	print('Begin show loop')
+	while True:
+		# ~ frame_end = time() + 1/30
+		_dmx.send_multi_value(1, _dmx_buffer)
+		# ~ sleep(max(0, frame_end - time()))
+		sleep(0.3)
 
 def _dmx_show():
-	_dmx.send_multi_value(1, _dmx_buffer)
+	_dmx.send_multi_value(1, _dmx_buffer)	
 	
 def dmx_blank():
 	_dmx_buffer[:] = [0 for v in range(0, _DMX_UNIVERSE_SIZE)]
@@ -40,26 +49,28 @@ def dmx_put_unit(unit=0, colour=0x000000, brightness=255):
 def dmx_close():
 	_dmx.close()
 
+	
 if __name__ == "__main__":
 	dmx_init()
-	print('Ramp blue')
+	
+	dmx_put_unit(0, 0x0000FF, 255)
+	# Start a separate process for the show loop
+	import threading
+	showloop = threading.Thread(target=test)
+	showloop.start()
+	
+	print('Ramp two units')
 	t_start = time()
-	frames = 250
-	for b in range (frames):
-		dmx_put_unit(0, b, 255)
+	frames = 10
+	for f in range (frames):
+		dmx_put_unit(0, 0x0000FF, int(f/frames*254))
+		dmx_put_unit(1, 0x00FF00, int(f/frames*254))
+		sleep(1)
+		
+		# ~ sleep(max(0, frame_end - time()))
+		
 	print('FPS:', frames/(time()-t_start))
-	print('Colour red')		
-	dmx_put_unit(0,0xFF0000,255)
-	# These particular units seem to need refreshing every half second or so
-	for i in range(10):
-		sleep(0.5)
-		_dmx_show()
-	print('Colour green')
-	dmx_put_unit(1,0x00FF00,255)
-	for i in range(10):
-		sleep(0.5)
-		_dmx_show()
 	print('Blank')
 	dmx_blank()
 	sleep(2)
-	#dmx_close()
+	dmx_close()
