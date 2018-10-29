@@ -16,23 +16,26 @@ _dmx_buffer = bytearray([0]*_DMX_UNIVERSE_SIZE)
 
 #~ _dmx_debug_start_t = None
 #~ _dmx_debug_f = 0
-
+_dmx_transfer = None
 def usb_transfer_loop():
+	"""
+	This is run in a separate thread. It keeps transmitting the DMX buffer
+	until asked to close by setting the global _dmx_transfer to False
+	"""
 	# Need to keep resending at the correct refresh rate. QLC+ says it's 30fps
-	print('DEBUG:dmx:19 Begin USB transfer loop')
+	global _dmx_transfer
+	_dmx_transfer = True # Set to false when we want this thread to stop
+	print('DEBUG:dmx:28 Begin USB transfer loop')
 	#~ global _dmx_debug_start_t, _dmx_debug_f
 	#~ _dmx_debug_start_t = time(); _dmx_debug_f = 0
-	while True:
-		# With no sleeps we seem to get about 20fps max
+	while _dmx_transfer:
+		# With no sleeps we seem to get about 20fps max with full 512 universe
 		#~ frame_end = time() + 1/30
 		_dmx.send_multi_value(1, _dmx_buffer)
 		#~ _dmx_debug_f += 1
 		#~ sleep(max(0, frame_end - time()))
-		#~ sleep(0.03)
+	print('DEBUG:dmx:28 End USB transfer loop')
 
-def _dmx_show():
-	_dmx.send_multi_value(1, _dmx_buffer)	
-	
 def dmx_blank():
 	_dmx_buffer[:] = [0 for v in range(0, _DMX_UNIVERSE_SIZE)]
 
@@ -41,10 +44,12 @@ def dmx_init():
 	print('DEBUG:dmx:35 Starting DMX controller')
 	_dmx = pyudmx.uDMXDevice()
 	_dmx.open()
+
 	# Start a separate thread for the USB data transfers (IO bound)
-	import threading
-	transfer_loop = threading.Thread(target=usb_transfer_loop)
-	transfer_loop.start()
+	if not _dmx_transfer:
+		import threading
+		transfer_loop = threading.Thread(target=usb_transfer_loop)
+		transfer_loop.start() # Start the loop; stop it by setting _dmx_transfer to False
 
 	dmx_blank()
 
@@ -58,8 +63,12 @@ def dmx_put_unit(unit=0, colour=0x000000, brightness=255):
 	#~ print('DEBUG:dmx:51 put unit=', unit, 'colour=', colour)
 
 def dmx_close():
+	dmx_blank()
+	sleep(0.1)
+	global _dmx_transfer
+	_dmx_transfer = False
+	sleep(0.1)
 	_dmx.close()
-
 	
 if __name__ == "__main__":
 	dmx_init()
@@ -79,7 +88,7 @@ if __name__ == "__main__":
 
 	print('Flash black/red')
 	t_start = time()
-	pause=0.3; frames = int(20/(5*pause));
+	pause=0.3; frames = int(5/(5*pause));
 	for f in range (frames):
 		dmx_put_unit(0, 0xFF0000, int(f/frames*254))
 		dmx_put_unit(1, 0x000000, int(f/frames*254))
@@ -96,5 +105,4 @@ if __name__ == "__main__":
 
 	print('Blank')
 	dmx_blank()
-	sleep(2)
 	dmx_close()
