@@ -1,4 +1,4 @@
-import time
+from time import time, sleep
 # comment out the next line if using the real neopixel library
 import sys, os
 import numpy
@@ -47,6 +47,7 @@ _led_count = None
 #----------------------- DMX control stuff
 from dmx import *
 
+_DMX_FPS = 2 # This is the best my lights can manage
 _dmx_off_auto_indep = None
 _dmx_gradient = None
 _dmx_t_start = None
@@ -54,7 +55,7 @@ _dmx_steps_per_repeat = None
 _dmx_steps_per_half = None
 _dmx_s_per_step = None
 _dmx_offsv = None
-_dmx_last_step = None
+_dmx_prev_step = None
 
 def _dmx_scale(dmx_maxval):
 	global _dmx_offsv
@@ -74,29 +75,29 @@ def _render_dmx(t_now):
 		if _dmx_steps_per_repeat == 0: # Nothing to do
 			return(t_now + 1000)
 
-		global _dmx_t_start, _dmx_last_step
+		global _dmx_t_start, _dmx_prev_step
 		if _dmx_t_start == 0:
 			_dmx_t_start = t_now
-			_dmx_last_step = -1
+			_dmx_prev_step = -1
 		
 		step = int((t_now -_dmx_t_start) // _dmx_s_per_step)
 		if step >= _dmx_steps_per_repeat:
 			step = 0
 			_dmx_t_start = t_now
 		
-		if step == _dmx_last_step:
+		if step == _dmx_prev_step:
 			pass # nothing to do	
 		else:
 			for u, offs in enumerate(_dmx_offsv):
 				offs_step = int((step + offs) % _dmx_steps_per_repeat)
-				print('DEBUG:animator:87 last_step=', _dmx_last_step, 'step=', step, ' offs_step=', offs_step)
+				#~ print('DEBUG:animator:87 prev_step=', _dmx_prev_step, 'step=', step, ' offs_step=', offs_step)
 				if offs_step < _dmx_steps_per_half: # Forwards through gradient
 					new_colour = _dmx_gradient[offs_step]
 				else: # Backwards
 					new_colour = _dmx_gradient[_dmx_steps_per_repeat - offs_step - 1]
 				# Set the new value
 				dmx_put_unit(u, new_colour, _max_brightness)
-			_dmx_last_step = step
+			_dmx_prev_step = step
 
 		return _dmx_t_start + (step+1) * _dmx_s_per_step	
 
@@ -291,7 +292,7 @@ def _render_frame():
 	Return the time of the next frame
 	"""
 	
-	t_now = time.time() # Use the same time throughout the calculations
+	t_now = time() # Use the same time throughout the calculations
 
 	# Handle blanking
 	if (_max_brightness == 0):
@@ -312,16 +313,16 @@ def _render_frame():
 			strip_data[s_off:s_off+_pat_seg_size]=strip_data[0:_pat_seg_size]
 		else: # have to put this segment in backwards
 			strip_data[s_off:s_off+_pat_seg_size]=strip_data[0:_pat_seg_size][::-1]
-	
-	# apply any sparkles and fade pattern
-	fade_t_next = _render_fade_spark(t_now)
 		
 	# Render the dmx units
 	dmx_t_next = _render_dmx(t_now)
+	
+	# apply any sparkles and fade pattern
+	fade_t_next = _render_fade_spark(t_now)
 
 	# Send the data to the LED strip
 	_pat_strip.show()
-	#print("{0:3.2f} {1:3.2f} {2:3.2f} {3:3.2f} ".format(t_now, time.time(), pat_t_next, spot_t_next))
+	#print("{0:3.2f} {1:3.2f} {2:3.2f} {3:3.2f} ".format(t_now, time(), pat_t_next, spot_t_next))
 	# Work out the soonest step to be done
 	return min(pat_t_next, fade_t_next, spot_t_next, dmx_t_next)
 #
@@ -341,7 +342,7 @@ def anim_init(led_count, max_brightness):
 	global _pat_strip
 	_pat_strip = PixelStrip(led_count, LED_PIN, LED_FREQ_HZ, 
 	LED_DMA, LED_INVERT, _max_brightness, LED_CHANNEL)
-	_pat_strip.getPixels()[:] = [RGB_Black]*(_led_count)
+	#_pat_strip.getPixels()[:] = [RGB_Black]*(_led_count)
 	_pat_strip.begin()
 
 	# Switch off sparkle, fade and spot
@@ -473,14 +474,13 @@ def anim_define_dmx(d_off_auto_indep=0, d_posv=[25,75], d_secs=5, d_gradient_des
 	global _dmx_posv
 	_dmx_posv = d_posv
 	
-	FPS = 10 # render at 10fps
-		
 	if d_off_auto_indep == 2: # independent
 		# Render a gradient with one entry per frame
-		frames_per_half = int(d_secs * FPS / 2)
+		frames_per_half = int(d_secs * _DMX_FPS / 2)
 		global _dmx_gradient
 		_dmx_gradient = [RGB_Black]*frames_per_half
 		d_gradient_desc.render(frames_per_half, _dmx_gradient)
+		print('DEBUG:animator:483 dmx_grad=', _dmx_gradient)
 		
 		global _dmx_steps_per_repeat, _dmx_steps_per_half, _dmx_s_per_step
 		_dmx_steps_per_half = frames_per_half
@@ -499,7 +499,7 @@ def anim_define_dmx(d_off_auto_indep=0, d_posv=[25,75], d_secs=5, d_gradient_des
 		# Transform dmx percent positions into offsets in LED strip
 		_dmx_offsv = d_posv[:]
 		_dmx_scale(_leds_in_use)
-		_dmx_s_per_step = 1 / FPS
+		_dmx_s_per_step = 1 / _DMX_FPS
 	
 def anim_define_meteor(m_on):
 	Pass #FIXME if !meteorMaster digitalWrite(METEOR_PIN, cur.meteorUserOn); # Don't write if under master control
@@ -528,11 +528,11 @@ def anim_render(stop_time=0):
 	start_time is the start of the animation, the animaiton steps count
 	from that time
 	"""
-	while stop_time == 0 or time.time() < stop_time:
+	while stop_time == 0 or time() < stop_time:
 		t_next = _render_frame()
 		if stop_time != 0: t_next = min(t_next, stop_time)
-		pause = t_next - time.time()
-		if pause > 0: time.sleep(pause)
+		pause = t_next - time()
+		if pause > 0: sleep(pause)
 		
 if __name__ == "__main__":
 	anim_init(150, 200)
@@ -541,5 +541,5 @@ if __name__ == "__main__":
 	anim_define_sparkle(s_per_k=10, s_duration=0.1)
 	anim_define_fade(f_secs=5, f_blend=SMOOTH, f_min=50, f_max=100)
 	anim_define_dmx(d_off_auto_indep=2, d_posv=[25,75], d_secs=5, d_gradient_desc=gradient_preset(3))
-	anim_render(time.time()+30)
+	anim_render(time()+30)
 	
