@@ -56,6 +56,7 @@ _dmx_steps_per_half = None
 _dmx_s_per_step = None
 _dmx_offsv = None
 _dmx_prev_step = None
+_dmx_max_vals = None
 
 def _dmx_scale(dmx_maxval):
 	global _dmx_offsv
@@ -70,24 +71,21 @@ def _render_dmx(t_now):
 	if _dmx_off_auto_indep == 0:
 		return(t_now + 1000)
 	
+	# Both independent and auto work on a step-by-step basis to 
+	# avoid overloading the DMX controller
+	global _dmx_t_start, _dmx_prev_step
+	if _dmx_t_start == 0:
+		_dmx_t_start = t_now
+		_dmx_prev_step = -1
+	step = int((t_now -_dmx_t_start) // _dmx_s_per_step)
+	if step >= _dmx_steps_per_repeat:
+		step = 0
+		_dmx_t_start = t_now
+		
 	if _dmx_off_auto_indep == 2:
 		# Lights are on their own independent fade pattern
-		if _dmx_steps_per_repeat == 0: # Nothing to do
-			return(t_now + 1000)
-
-		global _dmx_t_start, _dmx_prev_step
-		if _dmx_t_start == 0:
-			_dmx_t_start = t_now
-			_dmx_prev_step = -1
 		
-		step = int((t_now -_dmx_t_start) // _dmx_s_per_step)
-		if step >= _dmx_steps_per_repeat:
-			step = 0
-			_dmx_t_start = t_now
-		
-		if step == _dmx_prev_step:
-			pass # nothing to do	
-		else:
+		if step != _dmx_prev_step:
 			for u, offs in enumerate(_dmx_offsv):
 				offs_step = int((step + offs) % _dmx_steps_per_repeat)
 				#~ print('DEBUG:animator:87 prev_step=', _dmx_prev_step, 'step=', step, ' offs_step=', offs_step)
@@ -99,15 +97,20 @@ def _render_dmx(t_now):
 				dmx_put_unit(u, new_colour, _max_brightness)
 			_dmx_prev_step = step
 
-		return _dmx_t_start + (step+1) * _dmx_s_per_step	
-
 	else:
 		# Auto: dmx lights set according to their linked LEDs
+		# Find the maximum value during the step (lowest computational cost method)
+		global _dmx_max_vals
 		for u, offs in enumerate(_dmx_offsv):
-			dmx_put_unit(u, _pat_strip.getPixels()[offs], _max_brightness)
+			_dmx_max_vals[u] = max(_dmx_max_vals[u], _pat_strip.getPixels()[offs])
+		# If it's time for the next step, output the highest values we've seen
+		if step != _dmx_prev_step:
+			for u, max_val in enumerate(_dmx_max_vals):
+				dmx_put_unit(u, max_val, _max_brightness)
+				_dmx_max_vals[u] = 0 # reset for next step
+			_dmx_prev_step = step
 			
-		return t_now + _dmx_s_per_step
-		
+	return _dmx_t_start + (step+1) * _dmx_s_per_step		
 
 #----------------------- Fade and sparkle stuff
 _fade_blend = None				# square wave or sawtooth
@@ -476,19 +479,19 @@ def anim_define_dmx(d_off_auto_indep=0, d_posv=[25,75], d_secs=5, d_gradient_des
 	
 	if d_off_auto_indep == 2: # independent
 		# Render a gradient with one entry per frame
-		frames_per_half = int(d_secs * _DMX_FPS / 2)
+		# If d_secs is 0 or small then we get just one entry in the gradient = no changes
+		d_secs = max(d_secs, 2/_DMX_FPS)
+		frames_per_half = max(1, int(d_secs * _DMX_FPS / 2))
+		#~ print('DEBUG:animator:485 frames_per_half=',frames_per_half)
 		global _dmx_gradient
 		_dmx_gradient = [RGB_Black]*frames_per_half
 		d_gradient_desc.render(frames_per_half, _dmx_gradient)
-		print('DEBUG:animator:483 dmx_grad=', _dmx_gradient)
+		#~ print('DEBUG:animator:489 dmx_grad=', _dmx_gradient)
 		
 		global _dmx_steps_per_repeat, _dmx_steps_per_half, _dmx_s_per_step
 		_dmx_steps_per_half = frames_per_half
 		_dmx_steps_per_repeat = frames_per_half * 2
 		_dmx_s_per_step = d_secs / _dmx_steps_per_repeat
-		
-		global _dmx_t_start
-		_dmx_t_start = 0
 		
 		# Transform dmx percent positions into offsets in gradient
 		global _dmx_offsv
@@ -500,10 +503,13 @@ def anim_define_dmx(d_off_auto_indep=0, d_posv=[25,75], d_secs=5, d_gradient_des
 		_dmx_offsv = d_posv[:]
 		_dmx_scale(_leds_in_use)
 		_dmx_s_per_step = 1 / _DMX_FPS
+		_dmx_steps_per_repeat = 100 # arbitrary number
+		global _dmx_max_vals
+		_dmx_max_vals = [0]*len(_dmx_offsv)
+		
+	global _dmx_t_start
+	_dmx_t_start = 0
 	
-def anim_define_meteor(m_on):
-	Pass #FIXME if !meteorMaster digitalWrite(METEOR_PIN, cur.meteorUserOn); # Don't write if under master control
-
 def anim_set_max_brightness(new_b):
 	global _max_brightness
 	if new_b != _max_brightness:
