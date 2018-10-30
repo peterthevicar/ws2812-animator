@@ -333,7 +333,8 @@ def _render_frame():
 #
 def anim_init(led_count, max_brightness):
 	"""
-	Initial set up of the system
+	Initial set up of the system for a new display
+	Clears everything out and switches things off
 	"""
 	global _led_count, _gra_data
 	_led_count = led_count
@@ -345,7 +346,6 @@ def anim_init(led_count, max_brightness):
 	global _pat_strip
 	_pat_strip = PixelStrip(led_count, LED_PIN, LED_FREQ_HZ, 
 	LED_DMA, LED_INVERT, _max_brightness, LED_CHANNEL)
-	#_pat_strip.getPixels()[:] = [RGB_Black]*(_led_count)
 	_pat_strip.begin()
 
 	# Switch off sparkle, fade and spot
@@ -357,11 +357,27 @@ def anim_init(led_count, max_brightness):
 	_dmx_off_auto_indep = 0
 	try: dmx_close()
 	except: pass
+		
+def anim_stop():
+	"""
+	Called to turn everything off
+	"""
+	if _pat_strip != None:
+		anim_set_max_brightness(0) # ws281x cleans up after itself at the end
+	try: dmx_close()
+	except: pass
 	
 def anim_define_pattern(g_desc, segments, seg_reverse, motion, repeat_s, reverse):
 	"""
 	Set the globals for the main pattern generation. 
 	Rebuild the gradient and restart the animation.
+	g_desc is a gradient descriptor for the main gradient. This is repeated
+	in each of the segments (number of segments).
+	seg_reverse says whether the repeat of the gradient in each segement
+	is in the same direction or reverses segment-by-segment.
+	motion is LEFT, RIGHT, L2R1 or STOP and reverse says whether the
+	gradient movement reverses or repeats when it gets to the end of its
+	segment.
 	"""
 	global _spot_size
 	_spot_size = 0 # mustn't run spot for previous pattern in case segment size changes
@@ -409,6 +425,14 @@ def anim_define_pattern(g_desc, segments, seg_reverse, motion, repeat_s, reverse
 	# ~ print('DEBUG: seg_size',_pat_seg_size,'tot',_pat_seg_size*_pat_segments)
 
 def anim_define_spot(s_size, s_colour, s_motion=RIGHT, s_secs=5, s_reverse=REVERSE):
+	"""
+	Define a spot moving on top of the background gradient
+	s_size is the size of the spot in 32nds of the segement size.
+	The spot is a single colour (s_colour) and can move left, right, 2l1r
+	as defined by s_motion. s_secs is how long the spot takes to move 
+	the length of the segment. When it gets to the end it comes back 
+	(s_reverse=REVERSE) or starts again (s_reverse=REPEAT)
+	"""
 	global _spot_size, _spot_steps_per_repeat
 	if s_size <= 0:
 		_spot_size = 0
@@ -434,6 +458,10 @@ def anim_define_spot(s_size, s_colour, s_motion=RIGHT, s_secs=5, s_reverse=REVER
 	_spot_t_start = 0
 
 def anim_define_sparkle(s_per_k, s_duration=0.1):
+	"""
+	How many sparks (fully lit pixels) per thousand, and how long each should
+	be lit before going out.
+	"""
 	global _spark_count
 	_spark_count = s_per_k * _leds_in_use // 1000
 	
@@ -441,7 +469,12 @@ def anim_define_sparkle(s_per_k, s_duration=0.1):
 	_spark_duration = s_duration
 
 def anim_define_fade(f_secs, f_blend=SMOOTH, f_min=0, f_max=100):
-	
+	"""
+	Fade the whole LED strip in a cycle taking f_secs. The cycle can step
+	between f_min and f_max in one go or smoothly linearly interpolated.
+	f_min and f_max are in percent of the currently set max_brightness
+	which is calculated in _fade_scale
+	"""
 	global _fade_steps_per_repeat
 	if f_secs <= 0: # switch off fading
 		_fade_steps_per_repeat = 0
@@ -511,6 +544,11 @@ def anim_define_dmx(d_off_auto_indep=0, d_posv=[25,75], d_secs=5, d_gradient_des
 	_dmx_t_start = 0
 	
 def anim_set_max_brightness(new_b):
+	"""
+	Set the maximum brightness for the LEDs. As this tweaks the same
+	property of the LED string that fade does, we need to scale the 
+	values used by fade whenever this changes.
+	"""
 	global _max_brightness
 	if new_b != _max_brightness:
 		old_b = _max_brightness; _max_brightness = new_b
@@ -519,27 +557,16 @@ def anim_set_max_brightness(new_b):
 			_fade_scale(_fade_min*100/old_b, _fade_max*100/old_b)
 		_pat_strip.setBrightness(_max_brightness)
 
-def anim_stop():
-	"""
-	Called to turn everything off
-	"""
-	if _pat_strip != None:
-		anim_set_max_brightness(0)
-	try: dmx_stop()
-	except: pass
-		
 def anim_render(stop_time=0):
 	"""
-	Keep transfering the animation to the LEDs until time is up
-	start_time is the start of the animation, the animaiton steps count
-	from that time
+	Keep transfering the animation to the LEDs until we reach stop_time.
 	"""
-	while stop_time == 0 or time() < stop_time:
+	while time() < stop_time:
 		t_next = _render_frame()
 		if stop_time != 0: t_next = min(t_next, stop_time)
 		pause = t_next - time()
 		if pause > 0: sleep(pause)
-		
+				
 if __name__ == "__main__":
 	anim_init(150, 200)
 	anim_define_pattern(gradient_preset(6), 1, seg_reverse=REPEAT, motion=LEFT, repeat_s=5, reverse=REPEAT)
