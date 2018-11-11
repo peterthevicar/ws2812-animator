@@ -363,7 +363,9 @@ def anim_stop():
 	Called to turn everything off
 	"""
 	if _pat_strip != None:
+		#~ _pat_strip.getPixels()[:]=[RGB_Black]*_pat_Strip.numPixels()
 		anim_set_max_brightness(0) # ws281x cleans up after itself at the end
+		_pat_strip.show()
 	try: dmx_close()
 	except: pass
 	
