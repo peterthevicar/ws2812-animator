@@ -53,13 +53,13 @@ def dmx_init():
 
 	dmx_blank()
 
-def dmx_put_unit(unit=0, colour=0x000000, brightness=255):
+def dmx_put_unit(unit=0, colour=0x000000, brightness=255, strobe=0):
 	b = colour & 0xFF
 	g = (colour >> 8) & 0xFF
 	r = (colour >> 16) & 0xFF
 	chan_offs = _DMX_CHANS_PER_UNIT * unit
 	# Order correctly for the particular channel use of the unit
-	_dmx_buffer[chan_offs:chan_offs+_DMX_CHANS_PER_UNIT] = [brightness & 0xFF, r, g, b, 0, 0, 0]
+	_dmx_buffer[chan_offs:chan_offs+_DMX_CHANS_PER_UNIT] = [brightness & 0xFF, r, g, b, strobe & 0xFF, 0, 0]
 	#~ if unit==0: print('DEBUG:dmx:63 put unit=', unit, 'colour=', colour)
 
 def dmx_close():

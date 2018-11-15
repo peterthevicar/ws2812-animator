@@ -57,6 +57,7 @@ _dmx_s_per_step = None
 _dmx_offsv = None
 _dmx_prev_step = None
 _dmx_max_vals = None
+_dmx_strobe = 0
 
 def _dmx_scale(dmx_maxval):
 	global _dmx_offsv
@@ -94,7 +95,7 @@ def _render_dmx(t_now):
 				else: # Backwards
 					new_colour = _dmx_gradient[_dmx_steps_per_repeat - offs_step - 1]
 				# Set the new value
-				dmx_put_unit(u, new_colour, _max_brightness)
+				dmx_put_unit(u, new_colour, _max_brightness, _dmx_strobe)
 			_dmx_prev_step = step
 
 	else:
@@ -220,6 +221,7 @@ def _render_spot(t_now):
 # Pattern stuff
 _pat_motion_now = RIGHT				# Current direction of pattern motion
 _pat_reverse = REPEAT				# When pattern gets to end, does it repeat or reverse
+_pat_sequential = None				# Do you fill the segments from the whole gradient (True) or have the whole segment filled with the same colour (False)
 # Segment stuff
 _pat_segments = 0					# How many copies of the gradient to be fitted into the pattern
 _pat_seg_size = 0
@@ -246,7 +248,7 @@ def _set_l2r1_globals():
 	_l2r1_d = _l2r1_l - _l2r1_r
 	# ~ print('DEBUG: r=',_l2r1_r,' l=',_l2r1_l,' ss//t*t=',_pat_seg_size//_l2r1_t*_l2r1_t)
 
-def _render_pattern(t_now):
+def _render_segment(t_now):
 	# Find out which step we're on in the pattern, need to calculate this as timing is 
 	# important and we may need to skip steps to keep up
 	
@@ -282,7 +284,10 @@ def _render_pattern(t_now):
 		pat_ix = pat_ix % _pat_seg_size # cope with wrap around
 
 	# ~ print('DEBUG: step=',step, 'LEFT' if _pat_motion_now==LEFT else 'RIGHT' if _pat_motion_now==RIGHT else 'L2R1', "pat_seg=", _pat_seg_size, " pat_ix=", pat_ix)
-	_pat_strip.getPixels()[0:_pat_seg_size]=_gra_data[pat_ix:_pat_seg_size]+_gra_data[:pat_ix]
+	if _pat_sequential: # copy the gradient into the segment, offset by the pat_ix
+		_pat_strip.getPixels()[0:_pat_seg_size]=_gra_data[pat_ix:_pat_seg_size]+_gra_data[:pat_ix]
+	else: # non-sequential means the whole segment is the same colour
+		_pat_strip.getPixels()[0:_pat_seg_size]=[_gra_data[pat_ix]]*_pat_seg_size
 	
 	if _pat_motion_now == STOP:
 		return t_now + 10 # no need but it seems nice to refresh every now and again!
@@ -302,10 +307,10 @@ def _render_frame():
 		_pat_strip.show()
 		return t_now + 1
 
-	# copy the gradient into all the segments
-	pat_t_next = _render_pattern(t_now)
+	# copy the gradient into first segment at the right place (phase shift)
+	pat_t_next = _render_segment(t_now)
 	
-	# Third phase: draw the moving spot on top
+	# draw the moving spot on top
 	spot_t_next = _render_spot(t_now)
 	
 	# for multi-segment patterns, copy into the other segments
@@ -369,7 +374,7 @@ def anim_stop():
 	try: dmx_close()
 	except: pass
 	
-def anim_define_pattern(g_desc, segments, seg_reverse, motion, repeat_s, reverse):
+def anim_define_pattern(g_desc, segments=1, seg_reverse=REPEAT, motion=RIGHT, repeat_s=10, reverse=REPEAT):
 	"""
 	Set the globals for the main pattern generation. 
 	Rebuild the gradient and restart the animation.
@@ -387,8 +392,13 @@ def anim_define_pattern(g_desc, segments, seg_reverse, motion, repeat_s, reverse
 	global _gra_desc
 	_gra_desc = g_desc
 				
-	global _pat_segments, _pat_seg_size, _leds_in_use
-	_pat_segments = segments
+	global _pat_segments, _pat_seg_size, _leds_in_use, _pat_sequential
+	if segments <= 0: # asking all LEDS to change colour together
+		_pat_sequential = False
+		_pat_segments = 1
+	else:
+		_pat_sequential = True
+		_pat_segments = segments
 	_pat_seg_size = _led_count // _pat_segments
 	_set_l2r1_globals()
 	_leds_in_use = _pat_seg_size * _pat_segments
@@ -488,7 +498,7 @@ def anim_define_fade(f_secs, f_blend=SMOOTH, f_min=0, f_max=100):
 	_fade_s_per_repeat = f_secs
 	_fade_scale(f_min, f_max)
 		
-def anim_define_dmx(d_off_auto_indep=0, d_posv=[25,75], d_secs=5, d_gradient_desc=None):
+def anim_define_dmx(d_off_auto_indep=0, d_posv=[25,75], d_secs=5, d_gradient_desc=None, d_strobe=0):
 	"""
 	This controls DMX lights. They can be off, independent or auto.
 	Independent means they go through their own gradient, as defined in d_gradient_desc, taking d_secs to do it.
@@ -541,6 +551,9 @@ def anim_define_dmx(d_off_auto_indep=0, d_posv=[25,75], d_secs=5, d_gradient_des
 		_dmx_steps_per_repeat = 100 # arbitrary number
 		global _dmx_max_vals
 		_dmx_max_vals = [0]*len(_dmx_offsv)
+		
+	global _dmx_strobe
+	_dmx_strobe = d_strobe
 		
 	global _dmx_t_start
 	_dmx_t_start = 0
