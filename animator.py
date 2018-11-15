@@ -498,7 +498,7 @@ def anim_define_fade(f_secs, f_blend=SMOOTH, f_min=0, f_max=100):
 	_fade_s_per_repeat = f_secs
 	_fade_scale(f_min, f_max)
 		
-def anim_define_dmx(d_off_auto_indep=0, d_posv=[25,75], d_secs=5, d_gradient_desc=None, d_strobe=0):
+def anim_define_dmx(d_off_auto_indep=0, d_posv=[33,67], d_secs=5, d_gradient_desc=None, d_strobe=0):
 	"""
 	This controls DMX lights. They can be off, independent or auto.
 	Independent means they go through their own gradient, as defined in d_gradient_desc, taking d_secs to do it.

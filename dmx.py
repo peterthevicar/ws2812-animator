@@ -31,7 +31,11 @@ def usb_transfer_loop():
 	while _dmx_transfer:
 		# With no sleeps we seem to get about 20fps max with full 512 universe
 		#~ frame_end = time() + 1/30
-		_dmx.send_multi_value(1, _dmx_buffer)
+		try:
+			_dmx.send_multi_value(1, _dmx_buffer)
+		except ValueError:
+			pass
+			# ~ print('ERR:dmx:37 ValueError - no DMX device?')
 		#~ _dmx_debug_f += 1
 		#~ sleep(max(0, frame_end - time()))
 	print('DEBUG:dmx:28 End USB transfer loop')

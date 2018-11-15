@@ -98,7 +98,7 @@ class GradientDesc:
 			out_data[i:i+part_sz]=out_data[0:part_sz]
 		# put in the black bars
 		if self.bar_on > 0:
-			d_sz = max(1, size // 128)
+			d_sz = max(1, size // 75)
 			on_sz = self.bar_on * d_sz
 			off_sz = self.bar_off * d_sz
 			bar = [RGB_Black] * on_sz
