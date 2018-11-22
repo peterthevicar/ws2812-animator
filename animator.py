@@ -57,6 +57,7 @@ _dmx_s_per_step = None
 _dmx_offsv = None
 _dmx_prev_step = None
 _dmx_max_vals = None
+_dmx_brightness = 255;
 _dmx_strobe = 0
 
 def _dmx_scale(dmx_maxval):
@@ -95,7 +96,7 @@ def _render_dmx(t_now):
 				else: # Backwards
 					new_colour = _dmx_gradient[_dmx_steps_per_repeat - offs_step - 1]
 				# Set the new value
-				dmx_put_unit(u, new_colour, _max_brightness, _dmx_strobe)
+				dmx_put_unit(u, new_colour, _dmx_brightness, _dmx_strobe)
 			_dmx_prev_step = step
 
 	else:
@@ -107,7 +108,7 @@ def _render_dmx(t_now):
 		# If it's time for the next step, output the highest values we've seen
 		if step != _dmx_prev_step:
 			for u, max_val in enumerate(_dmx_max_vals):
-				dmx_put_unit(u, max_val, _max_brightness)
+				dmx_put_unit(u, max_val, _dmx_brightness, _dmx_strobe)
 				_dmx_max_vals[u] = 0 # reset for next step
 			_dmx_prev_step = step
 			
@@ -501,7 +502,7 @@ def anim_define_fade(f_secs, f_blend=SMOOTH, f_min=0, f_max=100):
 	_fade_s_per_repeat = f_secs
 	_fade_scale(f_min, f_max)
 		
-def anim_define_dmx(d_off_auto_indep=0, d_posv=[33,67], d_secs=5, d_gradient_desc=None, d_strobe=0):
+def anim_define_dmx(d_off_auto_indep=0, d_posv=[33,67], d_secs=5, d_gradient_desc=None, d_brightness=255, d_strobe=0):
 	"""
 	This controls DMX lights. They can be off, independent or auto.
 	Independent means they go through their own gradient, as defined in d_gradient_desc, taking d_secs to do it.
@@ -517,7 +518,7 @@ def anim_define_dmx(d_off_auto_indep=0, d_posv=[33,67], d_secs=5, d_gradient_des
 	try: dmx_close()
 	except: pass
 
-	if d_off_auto_indep == 0: # off
+	if d_off_auto_indep == 0 or d_brightness == 0: # off
 		return
 
 	dmx_init()
