@@ -38,7 +38,7 @@ class PixelStrip:
 		# ~ print('DEBUG:sim:31 n_rows=',self.N_ROWS,'per_row=',self.LEDS_PER_ROW)
 		# ~ self.IMAGE = numpy.zeros((self.LED_W * self.N_ROWS * 2, IMAGE_W, 3), numpy.uint8)
 		cv2.namedWindow('neopixel') # Create a named window
-		cv2.moveWindow('neopixel', 10,300) # Move it to a good place on the screen
+		cv2.moveWindow('neopixel', 10,20) # Move it to a good place on the screen
 		
 	def begin(self):
 		self.show()

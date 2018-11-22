@@ -130,12 +130,15 @@ _spark_t_start = 0				# when this pattern of sparles started
 _spark_duration = None			# how long each pattern of sparkles lasts (secs)
 
 def _fade_scale(f_min, f_max):
-       global _fade_min, _fade_max, _fade_steps_per_half, _fade_steps_per_repeat, _fade_s_per_step
-       _fade_min = int(_max_brightness*f_min/100)
-       _fade_max = int(_max_brightness*f_max/100)
-       _fade_steps_per_half = max(0, _fade_max - _fade_min)
-       _fade_steps_per_repeat = _fade_steps_per_half * 2
-       _fade_s_per_step = _fade_s_per_repeat / _fade_steps_per_repeat
+	global _fade_min, _fade_max, _fade_steps_per_half, _fade_steps_per_repeat, _fade_s_per_step
+	_fade_min = int(_max_brightness*f_min/100)
+	_fade_max = int(_max_brightness*f_max/100)
+	_fade_steps_per_half = max(0, _fade_max - _fade_min)
+	_fade_steps_per_repeat = _fade_steps_per_half * 2
+	if _fade_steps_per_repeat > 0:
+		_fade_s_per_step = _fade_s_per_repeat / _fade_steps_per_repeat
+	else:
+		_fade_s_per_step = 1
        # ~ print('DEBUG:animator:65 min=', _fade_min, ' max=', _fade_max, ' steps=',_fade_steps_per_repeat)
 
 def _render_fade_spark(t_now):
