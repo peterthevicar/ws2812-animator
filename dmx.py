@@ -8,6 +8,7 @@ except:
 	from pyudmx import pyudmx
 
 from time import sleep, time
+import threading
 
 _DMX_UNIVERSE_SIZE = 512
 _DMX_CHANS_PER_UNIT = 7
@@ -51,7 +52,6 @@ def dmx_init():
 
 	# Start a separate thread for the USB data transfers (IO bound)
 	if not _dmx_transfer:
-		import threading
 		transfer_loop = threading.Thread(target=usb_transfer_loop)
 		transfer_loop.start() # Start the loop; stop it by setting _dmx_transfer to False
 
