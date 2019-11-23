@@ -1,4 +1,5 @@
 from time import time, sleep
+from time import time, sleep
 # comment out the next line if using the real neopixel library
 import sys, os
 from numpy.random import randint
@@ -43,78 +44,6 @@ REPEAT=1; REVERSE=2
 _pat_strip = None # This is where the WS2812 library stores its stuff
 _max_brightness = None
 _led_count = None
-
-DMX_ANIMATION=None
-if DMX_ANIMATION:
-    #----------------------- DMX control stuff
-    from dmx import *
-
-    _DMX_FPS = 2 # This is the best my lights can manage
-    _dmx_off_auto_indep = None
-    _dmx_gradient = None
-    _dmx_t_start = None
-    _dmx_steps_per_repeat = None
-    _dmx_steps_per_half = None
-    _dmx_s_per_step = None
-    _dmx_offsv = None
-    _dmx_prev_step = None
-    _dmx_max_vals = None
-    _dmx_brightness = 255;
-    _dmx_strobe = 0
-
-    def _dmx_scale(dmx_maxval):
-        global _dmx_offsv
-        print('DEBUG:animator:61 _dmx_offsv=', _dmx_offsv)
-        _dmx_offsv = [int(offs/100 * dmx_maxval) for offs in _dmx_offsv]
-        print('DEBUG:animator:63 _dmx_offsv=', _dmx_offsv)
-        # ~ for ix, val in enumerate(_dmx_offsv):
-            # ~ _dmx_offsv[ix] = int(val/100) * dmx_maxval
-
-    def _render_dmx(t_now):
-        # Render the DMX flood lighting
-        if _dmx_off_auto_indep == 0:
-            return(t_now + 1000)
-        
-        # Both independent and auto work on a step-by-step basis to 
-        # avoid overloading the DMX controller
-        global _dmx_t_start, _dmx_prev_step
-        if _dmx_t_start == 0:
-            _dmx_t_start = t_now
-            _dmx_prev_step = -1
-        step = int((t_now -_dmx_t_start) // _dmx_s_per_step)
-        if step >= _dmx_steps_per_repeat:
-            step = 0
-            _dmx_t_start = t_now
-            
-        if _dmx_off_auto_indep == 2:
-            # Lights are on their own independent fade pattern
-            
-            if step != _dmx_prev_step:
-                for u, offs in enumerate(_dmx_offsv):
-                    offs_step = int((step + offs) % _dmx_steps_per_repeat)
-                    #~ print('DEBUG:animator:87 prev_step=', _dmx_prev_step, 'step=', step, ' offs_step=', offs_step)
-                    if offs_step < _dmx_steps_per_half: # Forwards through gradient
-                        new_colour = _dmx_gradient[offs_step]
-                    else: # Backwards
-                        new_colour = _dmx_gradient[_dmx_steps_per_repeat - offs_step - 1]
-                    # Set the new value
-                    dmx_put_unit(u, new_colour, _dmx_brightness, _dmx_strobe)
-                _dmx_prev_step = step
-
-        else:
-            # Auto: dmx lights set according to their linked LEDs
-            # Find the maximum value during the step (lowest computational cost method)
-            global _dmx_max_vals
-            for u, offs in enumerate(_dmx_offsv):
-                _dmx_max_vals[u] = max(_dmx_max_vals[u], _pat_strip.getPixels()[offs])
-            # If it's time for the next step, output the highest values we've seen
-            if step != _dmx_prev_step:
-                for u, max_val in enumerate(_dmx_max_vals):
-                    dmx_put_unit(u, max_val, _dmx_brightness, _dmx_strobe)
-                    _dmx_max_vals[u] = 0 # reset for next step
-                _dmx_prev_step = step
-                
-        return _dmx_t_start + (step+1) * _dmx_s_per_step        
 
 #----------------------- Fade and sparkle stuff
 _fade_blend = None              # square wave or sawtooth
@@ -328,10 +257,6 @@ def _render_frame():
         else: # have to put this segment in backwards
             strip_data[s_off:s_off+_pat_seg_size]=strip_data[0:_pat_seg_size][::-1]
         
-    # Render the dmx units
-    if DMX_ANIMATION:
-        dmx_t_next = _render_dmx(t_now)
-    
     # apply any sparkles and fade pattern
     fade_t_next = _render_fade_spark(t_now)
 
@@ -339,10 +264,7 @@ def _render_frame():
     _pat_strip.show()
     #print("{0:3.2f} {1:3.2f} {2:3.2f} {3:3.2f} ".format(t_now, time(), pat_t_next, spot_t_next))
     # Work out the soonest step to be done
-    if DMX_ANIMATION:
-        return min(pat_t_next, fade_t_next, spot_t_next, dmx_t_next)
-    else:
-        return min(pat_t_next, fade_t_next, spot_t_next)
+    return min(pat_t_next, fade_t_next, spot_t_next)
 #
 # -------------------------- INTERFACE FUNCTIONS ----------------------
 #
@@ -367,13 +289,6 @@ def anim_init(led_count, max_brightness):
     global _spark_count, _fade_steps_per_repeat, _spot_size
     _spark_count = 0; _fade_steps_per_repeat = 0; _spot_size = 0
     
-    # Switch off DMX
-    if DMX_ANIMATION:
-        global _dmx_off_auto_indep
-        _dmx_off_auto_indep = 0
-        try: dmx_close()
-        except: pass
-        
 def anim_stop():
     """
     Called to turn everything off
@@ -382,9 +297,6 @@ def anim_stop():
         #~ _pat_strip.getPixels()[:]=[RGB_Black]*_pat_Strip.numPixels()
         anim_set_max_brightness(0) # ws281x cleans up after itself at the end
         _pat_strip.show()
-    if DMX_ANIMATION:
-        try: dmx_close()
-        except: pass
     
 def anim_define_pattern(g_desc, segments=1, seg_reverse=REPEAT, motion=RIGHT, repeat_s=10, reverse=REPEAT):
     """
@@ -510,67 +422,6 @@ def anim_define_fade(f_secs, f_blend=SMOOTH, f_min=0, f_max=100):
     _fade_s_per_repeat = f_secs
     _fade_scale(f_min, f_max)
 
-if DMX_ANIMATION:       
-    def anim_define_dmx(d_off_auto_indep=0, d_posv=[33,67], d_secs=5, d_gradient_desc=None, d_brightness=255, d_strobe=0):
-        """
-        This controls DMX lights. They can be off, independent or auto.
-        Independent means they go through their own gradient, as defined in d_gradient_desc, taking d_secs to do it.
-        Auto means the lights are linked to the main pattern gradient, picking up their colour from 
-        the LED strip.
-        The dmx_posv vector says where each light is linked to the strip (in %)
-        In independent mode these positions are used to offset the dmx gradient index, i.e.
-        if one is at 25% and the other at 75% they will be 50% of the cycle apart (= 180 degrees)
-        """
-        global _dmx_off_auto_indep
-        _dmx_off_auto_indep = d_off_auto_indep
-        
-        try: dmx_close()
-        except: pass
-
-        if d_off_auto_indep == 0 or d_brightness == 0: # off
-            return
-
-        dmx_init()
-
-        global _dmx_posv
-        _dmx_posv = d_posv
-        
-        if d_off_auto_indep == 2: # independent
-            # Render a gradient with one entry per frame
-            # If d_secs is 0 or small then we get just one entry in the gradient = no changes
-            d_secs = max(d_secs, 2/_DMX_FPS)
-            frames_per_half = max(1, int(d_secs * _DMX_FPS / 2))
-            #~ print('DEBUG:animator:485 frames_per_half=',frames_per_half)
-            global _dmx_gradient
-            _dmx_gradient = [RGB_Black]*frames_per_half
-            d_gradient_desc.render(frames_per_half, _dmx_gradient)
-            #~ print('DEBUG:animator:489 dmx_grad=', _dmx_gradient)
-            
-            global _dmx_steps_per_repeat, _dmx_steps_per_half, _dmx_s_per_step
-            _dmx_steps_per_half = frames_per_half
-            _dmx_steps_per_repeat = frames_per_half * 2
-            _dmx_s_per_step = d_secs / _dmx_steps_per_repeat
-            
-            # Transform dmx percent positions into offsets in gradient
-            global _dmx_offsv
-            _dmx_offsv = d_posv[:]
-            _dmx_scale(_dmx_steps_per_repeat)
-            
-        else: # auto
-            # Transform dmx percent positions into offsets in LED strip
-            _dmx_offsv = d_posv[:]
-            _dmx_scale(_leds_in_use)
-            _dmx_s_per_step = 1 / _DMX_FPS
-            _dmx_steps_per_repeat = 100 # arbitrary number
-            global _dmx_max_vals
-            _dmx_max_vals = [0]*len(_dmx_offsv)
-            
-        global _dmx_strobe
-        _dmx_strobe = d_strobe
-            
-        global _dmx_t_start
-        _dmx_t_start = 0
-    
 def anim_set_max_brightness(new_b):
     """
     Set the maximum brightness for the LEDs. As this tweaks the same
@@ -601,7 +452,5 @@ if __name__ == "__main__":
     anim_define_spot(s_size=3, s_colour=0x00FF00, s_motion=RIGHT, s_secs=5, s_reverse=REVERSE)
     anim_define_sparkle(s_per_k=10, s_duration=0.1)
     anim_define_fade(f_secs=5, f_blend=SMOOTH, f_min=50, f_max=100)
-    if DMX_ANIMATION:
-        anim_define_dmx(d_off_auto_indep=2, d_posv=[25,75], d_secs=5, d_gradient_desc=gradient_preset(3))
     anim_render(time()+30)
     
