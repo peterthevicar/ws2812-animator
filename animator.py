@@ -268,9 +268,9 @@ def _render_frame():
 #
 # -------------------------- INTERFACE FUNCTIONS ----------------------
 #
-def anim_init(led_count, max_brightness):
+def anim_init(led_count):
     """
-    Initial set up of the system for a new display
+    Initial set up of the system for animations
     Clears everything out and switches things off
     """
     global _led_count, _gra_data
@@ -278,7 +278,7 @@ def anim_init(led_count, max_brightness):
     _gra_data = [0]*led_count # Maximum segment size
     
     global _max_brightness
-    _max_brightness = max_brightness
+    _max_brightness = 0
 
     global _pat_strip
     _pat_strip = PixelStrip(led_count, LED_PIN, LED_FREQ_HZ, 
@@ -295,7 +295,7 @@ def anim_stop():
     """
     if _pat_strip != None:
         #~ _pat_strip.getPixels()[:]=[RGB_Black]*_pat_Strip.numPixels()
-        anim_set_max_brightness(0) # ws281x cleans up after itself at the end
+        anim_set_max_brightness(0)
         _pat_strip.show()
     
 def anim_define_pattern(g_desc, segments=1, seg_reverse=REPEAT, motion=RIGHT, repeat_s=10, reverse=REPEAT):
