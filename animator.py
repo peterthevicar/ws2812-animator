@@ -78,7 +78,7 @@ def _render_fade_spark(t_now):
     global _sparkles, _spark_t_start
     if _spark_count > 0:
         if t_now - _spark_t_start > _spark_duration: # time to get a new set of sparkles
-            _sparkles = numpy.random.randint(0, _leds_in_use, _spark_count)
+            _sparkles = randint(0, _leds_in_use, _spark_count)
             _spark_t_start = t_now
         data = _pat_strip.getPixels()
         for i in _sparkles:
