@@ -70,7 +70,7 @@ class GradientDesc:
         """
         # calculate the max size of each of the repeats in the gradient
         part_sz = (size+self.repeats-1)//self.repeats
-        print("DEBUG: gradient part_sz=",part_sz)
+        # ~ print("DEBUG:gradients: gradient part_sz=",part_sz)
         # fill in the first part
         if self.blend != SMOOTH: # simple case
             ncols = len(self.colours)
@@ -90,8 +90,8 @@ class GradientDesc:
                     colour1 = self.colours[this_c]
                     colour2 = self.colours[this_c + 1]
                 out_data[i] = _interp(colour1, colour2, (i-cur_ci) / i_per_c)
-                # ~ print(i,ncols,this_c,'DEBUG: colour1 {0:#08x}, colour2 {1:#08x}, ipercol:{2:1.2f} ithisc:{3:d} res:{4:#08x} prop:{5:1.2f}'.format(colour1,colour2,i_per_c,cur_ci,out_data[i],float(i-cur_ci) / i_per_c))
-        # ~ print('DEBUG: part_sz=', part_sz, ' out_data=', out_data)
+                # ~ print(i,ncols,this_c,'DEBUG:gradients: colour1 {0:#08x}, colour2 {1:#08x}, ipercol:{2:1.2f} ithisc:{3:d} res:{4:#08x} prop:{5:1.2f}'.format(colour1,colour2,i_per_c,cur_ci,out_data[i],float(i-cur_ci) / i_per_c))
+        # ~ print('DEBUG:gradients: part_sz=', part_sz, ' out_data=', out_data)
         # Copy to other parts. Start at the top to avoid overwriting the master copy
         for part in range(self.repeats-1,0,-1): 
             i = size * part//self.repeats

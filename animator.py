@@ -144,10 +144,10 @@ def _render_spot(t_now):
     # Work out the direction we're going
     if _spot_motion_now == RIGHT: ix = step # Count up
     else: ix = _pat_seg_size -_spot_size - step # Count down
-    # ~ print('DEBUG: spot step=', step, '/', _spot_steps_per_repeat,' spot ix=', ix)
+    # ~ print('DEBUG:animator: spot step=', step, '/', _spot_steps_per_repeat,' spot ix=', ix)
 
     # Paint the spot in its current position
-    # ~ print('DEBUG: ix=', ix, ' _spot_size=', _spot_size)
+    # ~ print('DEBUG:animator: ix=', ix, ' _spot_size=', _spot_size)
     _pat_strip.getPixels()[ix:ix+_spot_size]=[_spot_colour]*_spot_size
             
     return _spot_t_start + _spot_s_per_step*(step+1); # Theoretical start time for next step (may be past)
@@ -181,7 +181,7 @@ def _set_l2r1_globals():
     _l2r1_r = max(1, _l2r1_l//3)
     _l2r1_t = _l2r1_l + _l2r1_r
     _l2r1_d = _l2r1_l - _l2r1_r
-    # ~ print('DEBUG: r=',_l2r1_r,' l=',_l2r1_l,' ss//t*t=',_pat_seg_size//_l2r1_t*_l2r1_t)
+    # ~ print('DEBUG:animator: r=',_l2r1_r,' l=',_l2r1_l,' ss//t*t=',_pat_seg_size//_l2r1_t*_l2r1_t)
 
 def _render_segment(t_now):
     # Find out which step we're on in the pattern, need to calculate this as timing is 
@@ -194,7 +194,7 @@ def _render_segment(t_now):
     
     global _pat_s_per_step, _pat_steps_per_repeat
     global _pat_motion_0, _pat_motion_now, _pat_reverse
-    # ~ print("DEBUG: _pat_motion_now=",_pat_motion_now)
+    # ~ print("DEBUG:animator: _pat_motion_now=",_pat_motion_now)
     if _pat_motion_now == STOP:
         step = 0
     else:
@@ -218,7 +218,7 @@ def _render_segment(t_now):
         pat_ix = (step // _l2r1_t) * _l2r1_d + (rem if rem <= _l2r1_l else _l2r1_l - (rem - _l2r1_l))
         pat_ix = pat_ix % _pat_seg_size # cope with wrap around
 
-    # ~ print('DEBUG: step=',step, 'LEFT' if _pat_motion_now==LEFT else 'RIGHT' if _pat_motion_now==RIGHT else 'L2R1', "pat_seg=", _pat_seg_size, " pat_ix=", pat_ix)
+    # ~ print('DEBUG:animator: step=',step, 'LEFT' if _pat_motion_now==LEFT else 'RIGHT' if _pat_motion_now==RIGHT else 'L2R1', "pat_seg=", _pat_seg_size, " pat_ix=", pat_ix)
     if _pat_sequential: # copy the gradient into the segment, offset by the pat_ix
         _pat_strip.getPixels()[0:_pat_seg_size]=_gra_data[pat_ix:_pat_seg_size]+_gra_data[:pat_ix]
     else: # non-sequential means the whole segment is the same colour
@@ -332,7 +332,7 @@ def anim_define_pattern(g_desc, segments=1, seg_reverse=REPEAT, motion=RIGHT, re
 
     global _pat_motion_now, _pat_steps_per_repeat
     _pat_motion_now = motion
-    # ~ print("DEBUG: motion=",motion,"seg_sz=",_pat_seg_size)
+    # ~ print("DEBUG:animator: motion=",motion,"seg_sz=",_pat_seg_size)
     if motion == LEFT or motion == RIGHT:
         _pat_steps_per_repeat = _pat_seg_size
     elif motion == L2R1:
@@ -340,13 +340,13 @@ def anim_define_pattern(g_desc, segments=1, seg_reverse=REPEAT, motion=RIGHT, re
         wholes = _pat_seg_size // _l2r1_d
         rem = _pat_seg_size % _l2r1_d
         _pat_steps_per_repeat = _l2r1_t * wholes + rem
-        # ~ print('DEBUG: seg_size',_pat_seg_size, 'steps_per_repeat',_pat_steps_per_repeat)
+        # ~ print('DEBUG:animator: seg_size',_pat_seg_size, 'steps_per_repeat',_pat_steps_per_repeat)
     else: # stop
         _pat_steps_per_repeat = 0;
 
     global _pat_s_per_step
     if motion != STOP: _pat_s_per_step = float(repeat_s) / _pat_steps_per_repeat
-    # ~ print("DEBUG: s_per_step=",_pat_s_per_step)
+    # ~ print("DEBUG:animator: s_per_step=",_pat_s_per_step)
 
     global _pat_reverse
     _pat_reverse = reverse
@@ -358,7 +358,7 @@ def anim_define_pattern(g_desc, segments=1, seg_reverse=REPEAT, motion=RIGHT, re
     # request restart of the animation
     global _pat_t_start
     _pat_t_start = 0
-    # ~ print('DEBUG: seg_size',_pat_seg_size,'tot',_pat_seg_size*_pat_segments)
+    # ~ print('DEBUG:animator: seg_size',_pat_seg_size,'tot',_pat_seg_size*_pat_segments)
 
 def anim_define_spot(s_size, s_colour, s_motion=RIGHT, s_secs=5, s_reverse=REVERSE):
     """
@@ -374,7 +374,7 @@ def anim_define_spot(s_size, s_colour, s_motion=RIGHT, s_secs=5, s_reverse=REVER
         _spot_size = 0
     else:
         _spot_size = max(1, s_size*_pat_seg_size // 32)
-        # ~ print('DEBUG: spot_sz=', _spot_size) 
+        # ~ print('DEBUG:animator: spot_sz=', _spot_size) 
         _spot_steps_per_repeat = _pat_seg_size - _spot_size; # Prevent overflow
             
     global _spot_colour
