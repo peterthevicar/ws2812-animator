@@ -322,7 +322,7 @@ def anim_define_pattern(g_desc, segments=1, seg_reverse=REPEAT, motion=RIGHT, re
         _pat_segments = 1
     else:
         _pat_sequential = True
-        _pat_segments = segments
+        _pat_segments = min(segments, _led_count) # can't have segments smaller than one LED
     _pat_seg_size = _led_count // _pat_segments
     _set_l2r1_globals()
     _leds_in_use = _pat_seg_size * _pat_segments
