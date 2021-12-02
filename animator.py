@@ -82,7 +82,7 @@ def _render_fade_spark(t_now):
             _spark_t_start = t_now
         data = _pat_strip.getPixels()
         for i in _sparkles:
-            data[i]=RGB_White
+            data[int(i)]=RGB_White
         t_next = _spark_t_start + _spark_duration
     else:
         t_next = t_now + 1000
